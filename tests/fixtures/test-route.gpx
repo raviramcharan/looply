@@ -1,0 +1,2 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<gpx version="1.1" creator="Looply test fixture" xmlns="http://www.topografix.com/GPX/1/1"><trk><name>Test — Vondelpark</name><desc>Testgeometrie voor import en export; geen gecontroleerde hardlooproute.</desc><trkseg><trkpt lat="52.3602" lon="4.8760"/><trkpt lat="52.3590" lon="4.8730"/><trkpt lat="52.3583" lon="4.8690"/><trkpt lat="52.3574" lon="4.8640"/><trkpt lat="52.3560" lon="4.8615"/><trkpt lat="52.3570" lon="4.8650"/><trkpt lat="52.3585" lon="4.8700"/><trkpt lat="52.3602" lon="4.8760"/></trkseg></trk></gpx>

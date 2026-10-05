@@ -1,0 +1,18 @@
+import 'dotenv/config';
+import express from 'express';
+import {resolveRoutingKey,requestPedestrianRoute,routingError} from './server-routing.mjs';
+import { z } from 'zod';
+const app=express();
+app.disable('x-powered-by');
+app.use(express.json({limit:'64kb'}));
+const quota=new Map();
+app.use('/api',(req,res,next)=>{const now=Date.now(), key=req.ip;let item=quota.get(key);if(!item||now-item.start>60000)item={start:now,count:0};item.count++;quota.set(key,item);if(item.count>40)return res.status(429).json({error:'Even rustig aan. Probeer het over een minuut opnieuw.'});next();});
+setInterval(()=>{for(const [key,item] of quota)if(Date.now()-item.start>60000)quota.delete(key)},60000).unref();
+app.get('/api/config',(_,res)=>res.json({routing:!!process.env.ORS_API_KEY}));
+const coords=z.tuple([z.number().min(-180).max(180),z.number().min(-90).max(90)]);
+app.post('/api/routing-key/test',async(req,res)=>{res.set('Cache-Control','no-store');try{const key=resolveRoutingKey(req.get('X-ORS-API-Key'),process.env.ORS_API_KEY);await requestPedestrianRoute(key,[[8.681495,49.41461],[8.687872,49.420318]]);res.json({ok:true});}catch(error){routingError(res,error)}});
+app.post('/api/route',async(req,res)=>{res.set('Cache-Control','no-store');try{const {coordinates}=z.object({coordinates:z.array(coords).min(2).max(50)}).parse(req.body);const key=resolveRoutingKey(req.get('X-ORS-API-Key'),process.env.ORS_API_KEY);const geometry=await requestPedestrianRoute(key,coordinates);res.json({coordinates:geometry});}catch(error){if(error instanceof z.ZodError)return res.status(400).json({error:'Ongeldige routepunten (maximaal 50).'});routingError(res,error);}});
+app.get('/api/search',async(req,res)=>{const q=String(req.query.q||'').trim();if(q.length<3||q.length>150)return res.status(400).json({error:'Gebruik 3 tot 150 tekens.'});try{const response=await fetch(`https://photon.komoot.io/api/?q=${encodeURIComponent(q)}&limit=5&lang=default&lat=52.36&lon=4.89`,{signal:AbortSignal.timeout(10000)});if(!response.ok)throw Error();const data=await response.json();res.json(data.features.map(f=>({coordinate:f.geometry.coordinates,label:[f.properties.name,f.properties.street,f.properties.housenumber].filter(Boolean).join(' '),context:[f.properties.city,f.properties.state,f.properties.country].filter(Boolean).join(', ')})));}catch{res.status(502).json({error:'Zoeken is tijdelijk niet beschikbaar. Je kunt een punt op de kaart kiezen.'});}});
+app.use(express.static('dist'));
+app.get('/{*path}',(_,res)=>res.sendFile(`${process.cwd()}/dist/index.html`));
+app.listen(Number(process.env.PORT)||3001,'0.0.0.0',()=>console.log('Looply API available on port '+(process.env.PORT||3001)));

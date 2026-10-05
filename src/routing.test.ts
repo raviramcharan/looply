@@ -1,0 +1,8 @@
+import {it,expect,vi,afterEach} from 'vitest';
+import {pedestrianSegment} from './routing';
+afterEach(()=>vi.unstubAllGlobals());
+it('requests a pedestrian backend and retains full geometry',async()=>{const geometry=[[4,52],[4.001,52.002],[4.01,52.01]];const fetcher=vi.fn().mockResolvedValue({ok:true,json:async()=>({coordinates:geometry})});vi.stubGlobal('fetch',fetcher);expect(await pedestrianSegment([4,52],[4.01,52.01],new AbortController().signal)).toEqual(geometry);expect(JSON.parse(fetcher.mock.calls[0][1].body).coordinates).toEqual([[4,52],[4.01,52.01]]);});
+it('does not turn provider failures into straight geometry',async()=>{vi.stubGlobal('fetch',vi.fn().mockResolvedValue({ok:false,json:async()=>({error:'Niet bereikbaar'})}));await expect(pedestrianSegment([4.1,52],[4.11,52.01],new AbortController().signal)).rejects.toThrow('Niet bereikbaar')});
+it('rejects aborted results even if transport completes',async()=>{const controller=new AbortController();vi.stubGlobal('fetch',vi.fn().mockImplementation(async()=>{controller.abort();return {ok:true,json:async()=>({coordinates:[[4.2,52],[4.21,52.01]]})}}));await expect(pedestrianSegment([4.2,52],[4.21,52.01],controller.signal)).rejects.toThrow('Afgebroken')});
+it('checks limits before the request',async()=>{const fetcher=vi.fn();vi.stubGlobal('fetch',fetcher);await expect(pedestrianSegment([4,52],[40,10],new AbortController().signal)).rejects.toThrow('200 km');expect(fetcher).not.toHaveBeenCalled()});
+it('rejects malformed upstream geometry',async()=>{vi.stubGlobal('fetch',vi.fn().mockResolvedValue({ok:true,json:async()=>({coordinates:[[4,92],[4,93]]})}));await expect(pedestrianSegment([4.3,52],[4.31,52.01],new AbortController().signal)).rejects.toThrow('ongeldige geometrie')});
